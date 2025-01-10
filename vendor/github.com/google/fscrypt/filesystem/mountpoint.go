@@ -25,7 +25,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -107,6 +106,7 @@ func getDeviceName(num DeviceNumber) string {
 // Parse one line of /proc/self/mountinfo.
 //
 // The line contains the following space-separated fields:
+//
 //	[0] mount ID
 //	[1] parent ID
 //	[2] major:minor
@@ -185,11 +185,11 @@ func addUncontainedSubtreesRecursive(dst map[string]bool,
 // preferably a read-write mount.  However, that doesn't work in containers
 // where the "/" subtree might not be mounted.  Here's a real-world example:
 //
-//              mnt.Subtree               mnt.Path
-//              -----------               --------
-//              /var/lib/lxc/base/rootfs  /
-//              /var/cache/pacman/pkg     /var/cache/pacman/pkg
-//              /srv/repo/x86_64          /srv/http/x86_64
+//	mnt.Subtree               mnt.Path
+//	-----------               --------
+//	/var/lib/lxc/base/rootfs  /
+//	/var/cache/pacman/pkg     /var/cache/pacman/pkg
+//	/srv/repo/x86_64          /srv/http/x86_64
 //
 // In this case, all mnt.Subtree are independent.  To handle this case, we must
 // choose the Mount whose mnt.Path contains the others, i.e. the first one.
@@ -200,10 +200,10 @@ func addUncontainedSubtreesRecursive(dst map[string]bool,
 // needed to correctly handle bind mounts.  For example, in the following case,
 // the first Mount should be chosen:
 //
-//              mnt.Subtree               mnt.Path
-//              -----------               --------
-//              /foo                      /foo
-//              /foo/dir                  /dir
+//	mnt.Subtree               mnt.Path
+//	-----------               --------
+//	/foo                      /foo
+//	/foo/dir                  /dir
 //
 // To solve this, we divide the mounts into non-overlapping trees of mnt.Path.
 // Then, we choose one of these trees which contains (exactly or via path
@@ -537,11 +537,15 @@ func getMountFromLink(link string) (*Mount, error) {
 }
 
 func (mnt *Mount) getFilesystemUUID() (string, error) {
-	dirContents, err := ioutil.ReadDir(uuidDirectory)
+	dirEntries, err := os.ReadDir(uuidDirectory)
 	if err != nil {
 		return "", err
 	}
-	for _, fileInfo := range dirContents {
+	for _, dirEntry := range dirEntries {
+		fileInfo, err := dirEntry.Info()
+		if err != nil {
+			continue
+		}
 		if fileInfo.Mode()&os.ModeSymlink == 0 {
 			continue // Only interested in UUID symlinks
 		}

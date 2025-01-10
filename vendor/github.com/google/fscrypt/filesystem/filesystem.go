@@ -21,21 +21,20 @@
 
 // Package filesystem deals with the structure of the files on disk used to
 // store the metadata for fscrypt. Specifically, this package includes:
-//	- mountpoint management (mountpoint.go)
-//		- querying existing mounted filesystems
-//		- getting filesystems from a UUID
-//		- finding the filesystem for a specific path
-//	- metadata organization (filesystem.go)
-//		- setting up a mounted filesystem for use with fscrypt
-//		- adding/querying/deleting metadata
-//		- making links to other filesystems' metadata
-//		- following links to get data from other filesystems
+//  1. mountpoint management (mountpoint.go)
+//     - querying existing mounted filesystems
+//     - getting filesystems from a UUID
+//     - finding the filesystem for a specific path
+//  2. metadata organization (filesystem.go)
+//     - setting up a mounted filesystem for use with fscrypt
+//     - adding/querying/deleting metadata
+//     - making links to other filesystems' metadata
+//     - following links to get data from other filesystems
 package filesystem
 
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/user"
@@ -45,9 +44,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/google/fscrypt/metadata"
 	"github.com/google/fscrypt/util"
@@ -196,6 +195,7 @@ func (err *ErrProtectorNotFound) Error() string {
 var SortDescriptorsByLastMtime = false
 
 // Mount contains information for a specific mounted filesystem.
+//
 //	Path           - Absolute path where the directory is mounted
 //	FilesystemType - Type of the mounted filesystem, e.g. "ext4"
 //	Device         - Device for filesystem (empty string if we cannot find one)
@@ -211,8 +211,9 @@ var SortDescriptorsByLastMtime = false
 // setup first. Specifically, the directories created look like:
 // <mountpoint>
 // └── .fscrypt
-//     ├── policies
-//     └── protectors
+//
+//	├── policies
+//	└── protectors
 //
 // These "policies" and "protectors" directories will contain files that are
 // the corresponding metadata structures for policies and protectors. The public
@@ -335,7 +336,7 @@ func (m *Mount) PolicyPath(descriptor string) string {
 // directory and returns a temporary Mount which represents this temporary
 // directory. The caller is responsible for removing this temporary directory.
 func (m *Mount) tempMount() (*Mount, error) {
-	tempDir, err := ioutil.TempDir(filepath.Dir(m.BaseDir()), tempPrefix)
+	tempDir, err := os.MkdirTemp(filepath.Dir(m.BaseDir()), tempPrefix)
 	return &Mount{Path: tempDir}, err
 }
 
@@ -393,7 +394,7 @@ func (m *Mount) isFscryptSetupAllowed() bool {
 		return true
 	}
 	switch m.FilesystemType {
-	case "ext4", "f2fs", "ubifs", "btrfs", "ceph", "xfs":
+	case "ext4", "f2fs", "ubifs", "btrfs", "ceph", "xfs", "lustre":
 		return true
 	default:
 		return false
@@ -635,7 +636,7 @@ func (m *Mount) writeData(path string, data []byte, owner *user.User, mode os.Fi
 	// Write the data to a temporary file, sync it, then rename into place
 	// so that the operation will be atomic.
 	dirPath := filepath.Dir(path)
-	tempFile, err := ioutil.TempFile(dirPath, tempPrefix)
+	tempFile, err := os.CreateTemp(dirPath, tempPrefix)
 	if err != nil {
 		log.Print(err)
 		if os.IsPermission(err) {
@@ -724,13 +725,13 @@ func (m *Mount) addMetadata(path string, md metadata.Metadata, owner *user.User)
 // considering that it could be a malicious file created to cause a
 // denial-of-service.  Specifically, the following checks are done:
 //
-// - It must be a regular file, not another type of file like a symlink or FIFO.
-//   (Symlinks aren't bad by themselves, but given that a malicious user could
-//   point one to absolutely anywhere, and there is no known use case for the
-//   metadata files themselves being symlinks, it seems best to disallow them.)
-// - It must have a reasonable size (<= maxMetadataFileSize).
-// - If trustedUser is non-nil, then the file must be owned by the given user
-//   or by root.
+//   - It must be a regular file, not another type of file like a symlink or FIFO.
+//     (Symlinks aren't bad by themselves, but given that a malicious user could
+//     point one to absolutely anywhere, and there is no known use case for the
+//     metadata files themselves being symlinks, it seems best to disallow them.)
+//   - It must have a reasonable size (<= maxMetadataFileSize).
+//   - If trustedUser is non-nil, then the file must be owned by the given user
+//     or by root.
 //
 // Take care to avoid TOCTOU (time-of-check-time-of-use) bugs when doing these
 // tests.  Notably, we must open the file before checking the file type, as the
@@ -767,7 +768,7 @@ func readMetadataFileSafe(path string, trustedUser *user.User) ([]byte, int64, e
 	}
 	// Read the file contents, allowing at most maxMetadataFileSize bytes.
 	reader := &io.LimitedReader{R: file, N: maxMetadataFileSize + 1}
-	data, err := ioutil.ReadAll(reader)
+	data, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, -1, err
 	}
