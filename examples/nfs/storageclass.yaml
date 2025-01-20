@@ -45,5 +45,17 @@ parameters:
   # If omitted, defaults to "csi-vol-".
   volumeNamePrefix: nfs-export-
 
+  # (optional) Security requirements for the NFS-export. Valid flavours
+  # include: none, sys, krb5, krb5i and krb5p. The <sectype-list> is a comma
+  # delimited string, for example "sys,krb5".
+  # This option is available with Ceph v17.2.6 and newer.
+  # secTypes: <sectype-list>
+
+  # (optional) The clients parameter in the storage class is used to limit
+  # access to the export to the set of hostnames, networks or ip addresses
+  # specified.  The <client-list> is a comma delimited string,
+  # for example: "192.168.0.10,192.168.1.0/8"
+  # clients: <client-list>
+
 reclaimPolicy: Delete
 allowVolumeExpansion: true

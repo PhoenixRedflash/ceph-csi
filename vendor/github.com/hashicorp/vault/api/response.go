@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package api
 
 import (
@@ -5,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 )
 
@@ -41,7 +43,7 @@ func (r *Response) Error() error {
 	}
 
 	r.Body.Close()
-	r.Body = ioutil.NopCloser(bodyBuf)
+	r.Body = io.NopCloser(bodyBuf)
 	ns := r.Header.Get(NamespaceHeaderName)
 
 	// Build up the error object
